@@ -1,7 +1,7 @@
 ---
-title: "Social engagement pre- and during Covid-19 pandemic-ATUS"
+title: "American Time Use Survey (ATUS) - Data Visualization"
 author: "Jiao YU"
-date: "2/4/2023"
+date: "2/3/2023"
 output: html_document
 ---
 
@@ -16,15 +16,19 @@ library(dplyr)
 library(tidyr)
 library(ggplot2)
 library(ggpubr)
-library(lubridate)
-library(survey)
 library(egg)
+library(survey)
+library(forcats)
+library(egg)
+library(lubridate)
+
+
 ```
 
 
 ```{r}
 ATUS<-read.dta("/Users/jiaoyu/Documents/Ph.D/projects/ATUS/data/atus_R.dta",convert.factors = F)
-
+head(ATUS)
 ```
 
 
@@ -33,7 +37,7 @@ ATUS<-read.dta("/Users/jiaoyu/Documents/Ph.D/projects/ATUS/data/atus_R.dta",conv
 df<-ATUS%>%filter(age>59)%>%select("engage_h","engage_nh", "year", "race4", "weight", "month", "caseid", "female", "edu4" )%>%mutate(ym=format(lubridate::ym(paste0(year,month)), "%Y.%m"), eg=engage_h+engage_nh)
 df$ym<-as.factor(df$ym)
 
-
+library(survey)
 sydata<-svydesign(id=~caseid, weights=~weight, data=df)
 
 datline<-svyby(~engage_h + engage_nh+eg, ~ym,   sydata,svymean,  keep.var=TRUE)
@@ -77,13 +81,337 @@ lplot<-ggplot(data=line, aes(x = ym, y = engage, group = group)) +
   theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1), legend.title = element_blank(),legend.text = element_text(size=12))+
      scale_linetype_manual(values =  c(  "longdash", "solid","dotted"))+
   coord_cartesian(ylim = c(0,100))
+lplot
 ```
 
-```{r warning=FALSE, message= F}
+```{r warning=FALSE}
 library(gganimate)
 
 
 lplot+geom_point() +
   transition_reveal(time)
 ```
+
+
+
+
+
+```{r eval=FALSE, echo=F }
+## Separate data by years ##
+df<-ATUS%>%filter(age>59 & year==2019)%>%select("engage_h","engage_nh", "year", "race4", "weight", "month", "caseid", "race4") 
+df<-ATUS%>%filter(age>59 & year==2020)%>%select("engage_h","engage_nh", "year", "race4", "weight", "month", "caseid", "race4") 
+df<-ATUS%>%filter(age>59 & year==2021)%>%select("engage_h","engage_nh", "year", "race4", "weight", "month", "caseid", "race4") 
+df<-df%>%mutate(ym=format(lubridate::ym(paste0(df$year,df$month)), "%Y.%m"))
+df$ym<-as.factor(df$ym)
+
+library(survey)
+sydata<-svydesign(id=~caseid, weights=~weight, data=df)
+
+datline<-svyby(~engage_h + engage_nh, ~ym,   sydata,svymean,  keep.var=TRUE)
+
+names(datline)<-c("ym", "engage.1", "engage.2", "se.1","se.2")
+
+line<-reshape(datline,
+        direction = "long",
+        idvar = "ym",       # i
+        timevar = "group",  # j
+        varying = c("engage.1", "engage.2", "se.1","se.2"))
+line$group<-factor(line$group, levels=c(1,2), labels=c("At home", "Outside home"))
+
+line$upper<-line$engage+1.96*line$se
+line$lower<-line$engage-1.96*line$se
+```
+
+
+
+
+```{r eval=FALSE, echo=F}
+## line plot by year
+lplot2021<-ggplot(data=line, aes(x = ym, y = engage,group = group)) +
+  geom_line(aes(linetype = group), size=0.7) +
+  #geom_ribbon(aes(ymin=lower, ymax=upper), linetype=2, alpha=0.01)+
+  labs( x= "Month" , y= 'Time (min)',title= "", color="", type="")+
+  theme_article()+
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1), legend.title = element_blank())+
+     scale_linetype_manual(values =  c("twodash","solid"))+
+  coord_cartesian(ylim = c(0,80))
+
+# egg package has ggarrange too. so specify ggpubr
+ggpubr:: ggarrange(lplot2019,lplot2020, lplot2021, labels = c("2019", "2020", "2021"), ncol=2, nrow=2, common.legend = TRUE, legend="bottom")
+
+```
+
+# Line plot by race 
+```{r  message= F}
+
+df<-ATUS%>%filter(age>59 )%>%select("engage_h","engage_nh", "year", "race4", "weight", "month", "caseid", "race4")
+df<-df%>%mutate(ym=format(lubridate::ym(paste0(df$year,df$month)), "%Y.%m"))
+df$ym<-as.factor(df$ym)
+
+library(survey)
+sydata<-svydesign(id=~caseid, weights=~weight, data=df)
+
+
+datline<-svyby(~engage_h + engage_nh, ~ym+race4,   sydata,svymean,  keep.var=TRUE)
+names(datline)<-c("ym", "race4",  "engage.1", "engage.2", "se.1","se.2")
+
+line<-reshape2::melt(datline, id.vars =c("ym", "race4"), measure.vars= c("engage.1", "engage.2"))
+
+line$group<-factor(line$variable, levels=c("engage.1","engage.2"), labels=c("At home", "Outside home"))
+
+line$race4<-factor(line$race4, levels=c(1:4), labels=c("White", "Black", "Hispanic", "Other"))
+```
+`
+
+```{r message= F }
+ggplot(data=line, aes(x = ym, y = value, color= factor(race4),group= factor(race4))) +
+  geom_line(size=0.7) +
+  #geom_ribbon(aes(ymin=lower, ymax=upper), linetype=2, alpha=0.01)+
+  labs( x= "Month" , y= 'Time (min)',title= "", color="", type="")+
+  theme_article()+
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1), legend.title = element_blank())+facet_wrap(~group)
+    # scale_linetype_manual(values =  c("twodash","solid"))+
+  #coord_cartesian(ylim = c(0,150))
+
+
+
+```
+
+
+
+
+
+
+# Bar charts
+```{r }
+datb<-svyby(~engage_h + engage_nh, ~year+race4,   sydata,svymean,  keep.var=TRUE)
+```
+
+
+```{r}
+ggplot(datb, aes(x = factor(race4), y =engage_nh, fill=factor(year))) +
+  geom_bar(stat="identity", color="black", width = 0.7,
+           position=position_dodge(0.7)) +
+ # scale_fill_manual(values=c("grey30", "grey42", "grey76"))+
+  geom_errorbar(aes(ymin=engage_nh-1.96*se.engage_nh, ymax=engage_nh+1.96*se.engage_nh), width=.2,
+                 position=position_dodge(0.7))+ theme_article()+
+  #geom_text(aes(label = round(engage_nh, 1)), size = 3, position = position_dodge(0.7), vjust = -0.5)+
+   theme(plot.caption = element_text(hjust = 0, vjust=7))+
+      #scale_x_discrete(labels= c("Male", "Female" ))+
+      #scale_x_discrete(labels= c(">HS", "HS", "Some college", "college+"))+
+    scale_x_discrete(labels= c("White", "Black", "Hispanic", "Other"))+
+  labs( x= " " , y= "Time",title= "Social engagement (outside home) by race", fill="Year", caption = "Error bar: 95% CI")
+
+
+```
+
+```{r}
+ggplot(datb, aes(x = factor(race4), y =engage_h, fill=factor(year))) + 
+  geom_bar(stat="identity", color="black", width = 0.7,
+           position=position_dodge(0.7)) +
+  #scale_fill_manual(values=c("grey30", "grey42", "grey76"))+
+  geom_errorbar(aes(ymin=engage_h-1.96*se.engage_h, ymax=engage_h+1.96*se.engage_h), width=.2,
+                 position=position_dodge(0.7))+ theme_article()+
+   theme(plot.caption = element_text(hjust = 0, vjust=7))+
+    #scale_x_discrete(labels= c("Male", "Female" ))+
+   #scale_x_discrete(labels= c(">HS", "HS", "Some college", "college+"))+
+    scale_x_discrete(labels= c("White", "Black", "Hispanic", "Other"))+
+  labs( x= " " , y= "Time",title= "Social engagement (at home) by race", fill="Year", caption = "Error bar: 95% CI")
+
+
+```
+
+
+# Boxplots
+```{r}
+ATUS<-read.dta("/Users/jiaoyu/Documents/Ph.D/projects/ATUS/data/atus_R.dta",convert.factors = T)
+df<-ATUS%>%filter(age>59)%>%select("p_h","p_nh", "year", "race4")%>%mutate(year=as.factor(year))
+
+databox<-reshape2::melt(df, id.vars = c("year", "race4"))
+
+```
+
+
+```{r message= F}
+ggplot(databox, aes(x = race4, y =value, color= year))+ 
+   stat_boxplot(geom = "errorbar", width = 0.5)+
+   geom_boxplot(width=0.5)+facet_wrap(~variable)+
+  labs( x= "" , y= "Predicted time of social engagement (min)",title= NULL, fill="")+theme_article()+ theme(legend.position = "bottom")+
+  scale_color_manual(values = c("#D16103", "#293352","#4E84C4")) +
+  theme(plot.margin = unit(c(1, 1, 4, 1), "lines"),
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank())
+
+```
+
+
+# Alluvium plots
+```{r message= F}
+library(ggalluvial)
+df<-ATUS%>%filter(age>59)%>%select("engage_h","engage_nh", "year", "race4", "weight", "month", "caseid")
+
+library(survey)
+sydata<-svydesign(id=~caseid, weights=~weight, data=df)
+datal<-svyby(~engage_h + engage_nh, ~year,   sydata, svymean,  keep.var=TRUE)
+
+names(datal)<-c("year", "engage.1", "engage.2", "se.1","se.2")
+
+al<-reshape(datal,
+        direction = "long",
+        idvar = "year",       # i
+        timevar = "group",  # j
+        varying = c("engage.1", "engage.2", "se.1","se.2"))
+al$group<-factor(al$group, levels=c(1,2), labels=c("At home", "Outside home"))
+```
+
+
+```{r warning=FALSE, message= F}
+ggplot(al, aes(axis1 = year, axis2 = group, y = engage)) +
+   geom_alluvium(aes(fill =group)) +
+  geom_stratum( alpha = .5) +
+scale_x_discrete(expand = c(.1, .1)) +
+  scale_fill_viridis_d() +
+  theme_minimal() +
+ geom_text(stat = "stratum",
+            aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("year", "group"),
+                   expand = c(0.15, 0.05)) +
+  theme_void()+
+   geom_text(aes(label = paste0(round(engage, 0), "min")), stat = "flow", nudge_x = -.25, alpha=0.7, size=3.5) + 
+  labs(title = "",
+      # subtitle = "",
+       x = NULL,
+       fill = NULL,
+       y = "")  # the \n adds a line break
+  
+
+
+
+
+
+```
+
+
+```{r warning=FALSE, message= F}
+library(readxl)    ## read multiple datas in one excel  
+read_excel_allsheets <- function(filename, tibble = FALSE) {
+    # I prefer straight data.frames
+    # but if you like tidyverse tibbles (the default with read_excel)
+    # then just pass tibble = TRUE
+    sheets <- readxl::excel_sheets(filename)
+    x <- lapply(sheets, function(X) readxl::read_excel(filename, sheet = X))
+    if(!tibble) x <- lapply(x, as.data.frame)
+    names(x) <- sheets
+    x
+}
+
+mysheets <- read_excel_allsheets("/Users/jiaoyu/Documents/Ph.D/projects/ATUS/data/activity_change.xlsx")
+
+library(scales)
+datawater<-mysheets$Sheet1
+datachange<-mysheets$Sheet2
+datachange<-datachange%>%mutate(per=percent(as.numeric(datachange$percent)), per=as.numeric(datachange$percent))
+```
+
+# waterfall plots
+```{r warning= F, message= F }
+library(waterfalls)
+water<-datawater%>%filter(activity=="Social and leisure activities" & place== "home")%>%select(year, value)%>%round(., 2)
+water$year<-factor(water$year, levels= c(2019, 2020, 2021))
+waterfall(water, put_rect_text_outside_when_value_below=0.5, rect_width = 0.4)+
+  theme_classic()+
+  labs(title="At home-Social and leisure activities",x = '', y = 'Time (min)')
+
+
+
+water<-datawater%>%filter(activity=="Social and leisure activities" & place== "nhome")%>%select(year, value)%>% round(., 2)
+water$year<-factor(water$year, levels= c (2019, 2020, 2021))
+waterfall(water, put_rect_text_outside_when_value_below=0.5,rect_width = 0.4, fill_colours=c("#D16103","#4E84C4"))+
+  theme_classic()+
+  labs(title="Outside home-Social and leisure activities",x = '', y = '')
+
+
+
+```
+
+
+
+# Lollipop plot
+```{r warning= F, message= F}
+library(ggstance)
+datachange$year<-factor(datachange$year, levels=c(2020, 2021), labels=c(2020, 2021))
+
+datachange$activity<-factor(datachange$activity, levels=c("Civic obligations and education", "Telephone call", "Religious and spiritual activities","Volunteer activities","Social and leisure activities"), labels=c("Civic obligations and education", "Telephone call", "Religious and spiritual activities","Volunteer activities","Social and leisure activities"))
+                       
+                       
+ggplot(datachange, aes(y=activity, x=percent*100, colour=factor(year))) +
+  ggstance::geom_pointrangeh(aes(xmin=0, xmax=percent*100), position=position_dodgev(height=-0.5), 
+ linetype=ifelse(datachange$type=="p", "dashed", "solid")
+                             )+
+  geom_vline(xintercept = 0,
+               colour = "grey60",
+               linetype = 2)+ # vertical line
+facet_wrap(~place,ncol=1)+
+ theme_article()+
+  labs(color = "Year", x= "Changes of time (%)", y ="",caption = "Note:The percentage of changes in social engagement time at 2010 and 2021, compared to 2019.\n ")+
+ scale_color_manual(values=c("#D16103","#4E84C4"))+
+  scale_x_continuous(breaks=c(-80,-60, -40, -20, 0, 20, 40, 60, 100, 150),
+                       labels=c( "-80", "-60%", "-40%","-20%" , "0", "20%", "40%", "60%","100%", "300%"))+theme(axis.text.x = element_text(size=8))
+
+
+
+```
+
+
+```{r warning=FALSE, message= F}
+#map by states
+library(mapdata)
+library(viridis)
+library(ggthemes)
+library(RColorBrewer)
+
+ATUS<-read.dta("/Users/jiaoyu/Documents/Ph.D/projects/ATUS/data/atus_R.dta",convert.factors = T)
+states<-map_data("state")
+
+df<-ATUS%>%filter(age>59)%>%select("engage_h","engage_nh","statefip", "weight", "caseid", "year")
+
+df<-ATUS%>%select("engage_h","engage_nh","statefip", "weight", "caseid", "year")
+
+colnames(df)[3]<-"region"
+
+sydata<-svydesign(id=~caseid, weights=~weight, data=df)
+
+map1<-svyby(~engage_h + engage_nh, ~region+year,   sydata,svymean,  keep.var=TRUE)
+
+
+map<-map1%>%filter(year==2021)
+
+MergedStates <-states%>%left_join(map, by = "region")
+
+```
+
+```{r message= F}
+ggplot()+ 
+  geom_polygon( data=MergedStates, 
+          aes(x=long, y=lat, group=group, fill = engage_h))+
+scale_color_viridis()+
+theme_map() +
+   #scale_fill_viridis(trans = "reverse")
+scale_fill_distiller(palette = "RdYlBu",trans = "reverse", name = "At home")+labs(title= "Social engagement at home by states-2021")
+
+ggplot()+ 
+  geom_polygon( data=MergedStates, 
+          aes(x=long, y=lat, group=group, fill = engage_nh))+
+scale_color_viridis()+
+theme_map() +
+   #scale_fill_viridis(trans = "reverse")
+scale_fill_distiller(palette = "RdYlBu",trans = "reverse", name = "Outside home")+labs(title= "Social engagement outside home by states-2021")
+
+
+
+
+```
+
 
