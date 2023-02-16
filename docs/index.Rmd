@@ -1,6 +1,7 @@
 ---
-title: "American Time Use Survey (ATUS) - Data Visualization"
-author: "Jiao YU"
+title: "How Older Adults Spent Their Time for Social Engagement During Covid-19"
+subtitle: "American Time Use Survey (ATUS) - Data Visualization"
+author: "Jiao Yu"
 date: "2/3/2023"
 output: html_document
 ---
@@ -25,14 +26,62 @@ library(lubridate)
 
 ```
 
+Let's take a quick look at our data. We have ATUS data from 2019 to 2021. ATUS, initiated in 2003, employs a computer-assisted telephone interview method to collect information from a nationally representative sample of the U.S. noninstitutionalized population. One individual aged at least 15 years old in each selected household retrospectively reported daily activities and corresponding time intervals throughout the 24 hours. Data contain basic demographic information and time (in minutes) spent on each of the following activities: 
 
-```{r}
+ 1. volunteer activities
+ 2. religious and spiritual activities
+ 3. civic obligations and education-related activities
+ 4. social, relaxing, and leisure activities
+ 5. telephone calls
+```{r kableExtra-table}
 ATUS<-read.dta("/Users/jiaoyu/Documents/Ph.D/projects/ATUS/data/atus_R.dta",convert.factors = F)
 head(ATUS)
 ```
+# Alluvium plots
+A summary of in-home and out-of-home social engagement time across three years (2019-2021).
+```{r message= F}
+library(ggalluvial)
+df<-ATUS%>%filter(age>59)%>%select("engage_h","engage_nh", "year", "race4", "weight", "month", "caseid")
 
+library(survey)
+sydata<-svydesign(id=~caseid, weights=~weight, data=df)
+datal<-svyby(~engage_h + engage_nh, ~year,   sydata, svymean,  keep.var=TRUE)
+
+names(datal)<-c("year", "engage.1", "engage.2", "se.1","se.2")
+
+al<-reshape(datal,
+        direction = "long",
+        idvar = "year",       # i
+        timevar = "group",  # j
+        varying = c("engage.1", "engage.2", "se.1","se.2"))
+al$group<-factor(al$group, levels=c(1,2), labels=c("At home", "Outside home"))
+```
+
+
+```{r warning=FALSE, message= F}
+ggplot(al, aes(axis1 = year, axis2 = group, y = engage)) +
+   geom_alluvium(aes(fill =group)) +
+  geom_stratum( alpha = .5) +
+scale_x_discrete(expand = c(.1, .1)) +
+  scale_fill_viridis_d() +
+  theme_minimal() +
+ geom_text(stat = "stratum",
+            aes(label = after_stat(stratum))) +
+  scale_x_discrete(limits = c("year", "group"),
+                   expand = c(0.15, 0.05)) +
+  theme_void()+
+   geom_text(aes(label = paste0(round(engage, 0), "min")), stat = "flow", nudge_x = -.25, alpha=0.7, size=3.5) + 
+  labs(title = "",
+      # subtitle = "",
+       x = NULL,
+       fill = NULL,
+       y = "")  # the \n adds a line break
+
+```
 
 # Line plots
+
+Here we present a line plot to show how older adults use their time  before and over the course of the pandemic. Note, due to the impact of the pandemic, data collection was paused from March 18, 2020, to May 9, 2020. We actually have a missing month for April 2020. 
 ```{r message= F}
 df<-ATUS%>%filter(age>59)%>%select("engage_h","engage_nh", "year", "race4", "weight", "month", "caseid", "female", "edu4" )%>%mutate(ym=format(lubridate::ym(paste0(year,month)), "%Y.%m"), eg=engage_h+engage_nh)
 df$ym<-as.factor(df$ym)
@@ -56,18 +105,19 @@ line$time<-seq(1,nrow(line), 1)
 ```
 
 
+
 ```{r message= F}
-lplot<-ggplot(data=line, aes(x = ym, y = engage, group = group)) +
-  geom_rect(aes(xmin='2019.01',
-                  xmax = '2019.12',
-                  ymin = -Inf,
-                  ymax = Inf),  fill = "grey85",  alpha = 0.03) +
-    geom_rect(aes(xmin='2021.01',
-                  xmax = '2021.12',
-                  ymin = -Inf,
-                  ymax = Inf),  fill = "grey85",  alpha = 0.03) +
-  geom_line(aes(linetype = group), size=0.5) +
-  geom_point(aes(shape=group), fill = "white", size = 1.5)+
+lplot<-ggplot(data=line, aes(x = ym, y = engage, color= group, group= group)) +
+  #geom_rect(aes(xmin='2019.01',
+                 # xmax = '2019.12',
+                 # ymin = -Inf,
+                #   ymax = Inf),  fill = "grey85",  alpha = 0.03) +
+    #geom_rect(aes(xmin='2021.01',
+               # xmax = '2021.12',
+               #   ymin = -Inf,
+               #   ymax = Inf),  fill = "grey85",  alpha = 0.03) +
+  geom_line( size=0.5) +
+  geom_point(  size = 1.5)+
  #geom_ribbon(aes(ymin=lower, ymax=upper), linetype=2, alpha=0.01)+
   
   geom_vline(xintercept = "2020.05",
@@ -79,11 +129,11 @@ lplot<-ggplot(data=line, aes(x = ym, y = engage, group = group)) +
   labs( x= "Month" , y= 'Time (min)',title= "", color="", type="")+
   theme_article()+
   theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1), legend.title = element_blank(),legend.text = element_text(size=12))+
-     scale_linetype_manual(values =  c(  "longdash", "solid","dotted"))+
+  scale_color_manual(values = c("#D16103", "#293352","#9999CC")) +
   coord_cartesian(ylim = c(0,100))
-lplot
+#lplot
 ```
-
+Here `gganimate` gives us a nice animation plot.
 ```{r warning=FALSE}
 library(gganimate)
 
@@ -142,7 +192,8 @@ ggpubr:: ggarrange(lplot2019,lplot2020, lplot2021, labels = c("2019", "2020", "2
 ```
 
 # Line plot by race 
-```{r  message= F}
+
+```{r  message= F, warning= FALSE}
 
 df<-ATUS%>%filter(age>59 )%>%select("engage_h","engage_nh", "year", "race4", "weight", "month", "caseid", "race4")
 df<-df%>%mutate(ym=format(lubridate::ym(paste0(df$year,df$month)), "%Y.%m"))
@@ -163,18 +214,14 @@ line$race4<-factor(line$race4, levels=c(1:4), labels=c("White", "Black", "Hispan
 ```
 `
 
-```{r message= F }
+```{r message= F , warning= F}
 ggplot(data=line, aes(x = ym, y = value, color= factor(race4),group= factor(race4))) +
   geom_line(size=0.7) +
   #geom_ribbon(aes(ymin=lower, ymax=upper), linetype=2, alpha=0.01)+
   labs( x= "Month" , y= 'Time (min)',title= "", color="", type="")+
   theme_article()+
   theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1), legend.title = element_blank())+facet_wrap(~group)
-    # scale_linetype_manual(values =  c("twodash","solid"))+
-  #coord_cartesian(ylim = c(0,150))
-
-
-
+    
 ```
 
 
@@ -183,10 +230,11 @@ ggplot(data=line, aes(x = ym, y = value, color= factor(race4),group= factor(race
 
 
 # Bar charts
+
+The pattern for out of home engagement is consistent across racial groups. We see a decline in 2020 and a recovery in 2021. The magnitude differs for different racial groups. In home activity time seems increases for Blacks and Other racial groups (almost Asian), But not for Whites or Hispanics. 
 ```{r }
 datb<-svyby(~engage_h + engage_nh, ~year+race4,   sydata,svymean,  keep.var=TRUE)
 ```
-
 
 ```{r}
 ggplot(datb, aes(x = factor(race4), y =engage_nh, fill=factor(year))) +
@@ -204,6 +252,7 @@ ggplot(datb, aes(x = factor(race4), y =engage_nh, fill=factor(year))) +
 
 
 ```
+
 
 ```{r}
 ggplot(datb, aes(x = factor(race4), y =engage_h, fill=factor(year))) + 
@@ -227,7 +276,7 @@ ggplot(datb, aes(x = factor(race4), y =engage_h, fill=factor(year))) +
 ATUS<-read.dta("/Users/jiaoyu/Documents/Ph.D/projects/ATUS/data/atus_R.dta",convert.factors = T)
 df<-ATUS%>%filter(age>59)%>%select("p_h","p_nh", "year", "race4")%>%mutate(year=as.factor(year))
 
-databox<-reshape2::melt(df, id.vars = c("year", "race4"))
+databox<-reshape2::melt(df, id.vars = c("year", "race4"))%>%mutate(group=factor(variable, levels=c("p_h","p_nh"), labels=c("At home", "Outside home")))
 
 ```
 
@@ -235,10 +284,10 @@ databox<-reshape2::melt(df, id.vars = c("year", "race4"))
 ```{r message= F}
 ggplot(databox, aes(x = race4, y =value, color= year))+ 
    stat_boxplot(geom = "errorbar", width = 0.5)+
-   geom_boxplot(width=0.5)+facet_wrap(~variable)+
-  labs( x= "" , y= "Predicted time of social engagement (min)",title= NULL, fill="")+theme_article()+ theme(legend.position = "bottom")+
+   geom_boxplot(width=0.5)+facet_wrap(~group)+
+  labs( x= "" , y= "Predicted time of social engagement(min)",title= NULL, fill="")+theme_article()+ theme(legend.position = "bottom")+
   scale_color_manual(values = c("#D16103", "#293352","#4E84C4")) +
-  theme(plot.margin = unit(c(1, 1, 4, 1), "lines"),
+  theme(plot.margin = unit(c(1, 2, 1, 1), "lines"),
         axis.title.x = element_blank(),
         axis.text.x = element_blank(),
         panel.grid.major.x = element_blank(),
@@ -247,51 +296,7 @@ ggplot(databox, aes(x = race4, y =value, color= year))+
 ```
 
 
-# Alluvium plots
-```{r message= F}
-library(ggalluvial)
-df<-ATUS%>%filter(age>59)%>%select("engage_h","engage_nh", "year", "race4", "weight", "month", "caseid")
 
-library(survey)
-sydata<-svydesign(id=~caseid, weights=~weight, data=df)
-datal<-svyby(~engage_h + engage_nh, ~year,   sydata, svymean,  keep.var=TRUE)
-
-names(datal)<-c("year", "engage.1", "engage.2", "se.1","se.2")
-
-al<-reshape(datal,
-        direction = "long",
-        idvar = "year",       # i
-        timevar = "group",  # j
-        varying = c("engage.1", "engage.2", "se.1","se.2"))
-al$group<-factor(al$group, levels=c(1,2), labels=c("At home", "Outside home"))
-```
-
-
-```{r warning=FALSE, message= F}
-ggplot(al, aes(axis1 = year, axis2 = group, y = engage)) +
-   geom_alluvium(aes(fill =group)) +
-  geom_stratum( alpha = .5) +
-scale_x_discrete(expand = c(.1, .1)) +
-  scale_fill_viridis_d() +
-  theme_minimal() +
- geom_text(stat = "stratum",
-            aes(label = after_stat(stratum))) +
-  scale_x_discrete(limits = c("year", "group"),
-                   expand = c(0.15, 0.05)) +
-  theme_void()+
-   geom_text(aes(label = paste0(round(engage, 0), "min")), stat = "flow", nudge_x = -.25, alpha=0.7, size=3.5) + 
-  labs(title = "",
-      # subtitle = "",
-       x = NULL,
-       fill = NULL,
-       y = "")  # the \n adds a line break
-  
-
-
-
-
-
-```
 
 
 ```{r warning=FALSE, message= F}
@@ -316,13 +321,15 @@ datachange<-datachange%>%mutate(per=percent(as.numeric(datachange$percent)), per
 ```
 
 # waterfall plots
+
+Waterfall plots can easily show changes across years. Here, we show how time spent on social and leisure activities changeS during the pandemic at in-home and out-of-home settings. 
 ```{r warning= F, message= F }
 library(waterfalls)
 water<-datawater%>%filter(activity=="Social and leisure activities" & place== "home")%>%select(year, value)%>%round(., 2)
 water$year<-factor(water$year, levels= c(2019, 2020, 2021))
 waterfall(water, put_rect_text_outside_when_value_below=0.5, rect_width = 0.4)+
   theme_classic()+
-  labs(title="At home-Social and leisure activities",x = '', y = 'Time (min)')
+  labs(title="At Home-social and leisure activities",x = '', y = 'Time (min)')
 
 
 
@@ -330,7 +337,7 @@ water<-datawater%>%filter(activity=="Social and leisure activities" & place== "n
 water$year<-factor(water$year, levels= c (2019, 2020, 2021))
 waterfall(water, put_rect_text_outside_when_value_below=0.5,rect_width = 0.4, fill_colours=c("#D16103","#4E84C4"))+
   theme_classic()+
-  labs(title="Outside home-Social and leisure activities",x = '', y = '')
+  labs(title="Outside Home-social and leisure activities",x = '', y = '')
 
 
 
@@ -339,6 +346,8 @@ waterfall(water, put_rect_text_outside_when_value_below=0.5,rect_width = 0.4, fi
 
 
 # Lollipop plot
+
+Another way to show changes across time using lollipop plots. Most in-home activity time changes positively, i.e. increases in time spent at home. Most out-of-home activity time chanegs negatively, i.e. decreases in time spent outside home.
 ```{r warning= F, message= F}
 library(ggstance)
 datachange$year<-factor(datachange$year, levels=c(2020, 2021), labels=c(2020, 2021))
@@ -363,8 +372,8 @@ facet_wrap(~place,ncol=1)+
 
 
 ```
-
-
+# Time Use Maps 
+You may also interested in finding state differences in how older adults spent their time before and during the pandemic. We can see a reduction of time spent on outside home activities in 2020, the pandemic year compared to 2019, the pre-pandemic year.
 ```{r warning=FALSE, message= F}
 #map by states
 library(mapdata)
@@ -386,28 +395,31 @@ sydata<-svydesign(id=~caseid, weights=~weight, data=df)
 map1<-svyby(~engage_h + engage_nh, ~region+year,   sydata,svymean,  keep.var=TRUE)
 
 
-map<-map1%>%filter(year==2021)
+map19<-map1%>%filter(year==2019)
+map20<-map1%>%filter(year==2020)
 
-MergedStates <-states%>%left_join(map, by = "region")
+MergedStates19 <-states%>%left_join(map19, by = "region")
+MergedStates20 <-states%>%left_join(map20, by = "region")
+
 
 ```
 
 ```{r message= F}
 ggplot()+ 
-  geom_polygon( data=MergedStates, 
-          aes(x=long, y=lat, group=group, fill = engage_h))+
-scale_color_viridis()+
-theme_map() +
-   #scale_fill_viridis(trans = "reverse")
-scale_fill_distiller(palette = "RdYlBu",trans = "reverse", name = "At home")+labs(title= "Social engagement at home by states-2021")
-
-ggplot()+ 
-  geom_polygon( data=MergedStates, 
+  geom_polygon( data=MergedStates19, 
           aes(x=long, y=lat, group=group, fill = engage_nh))+
 scale_color_viridis()+
 theme_map() +
    #scale_fill_viridis(trans = "reverse")
-scale_fill_distiller(palette = "RdYlBu",trans = "reverse", name = "Outside home")+labs(title= "Social engagement outside home by states-2021")
+scale_fill_distiller(palette = "RdYlBu", name = "At home")+labs(title= "Social engagement outside home by states-2019")
+
+ggplot()+ 
+  geom_polygon( data=MergedStates20, 
+          aes(x=long, y=lat, group=group, fill = engage_nh))+
+scale_color_viridis()+
+theme_map() +
+   #scale_fill_viridis(trans = "reverse")
+scale_fill_distiller(palette = "RdYlBu", name = "Outside home")+labs(title= "Social engagement outside home by states-2020")
 
 
 
