@@ -372,8 +372,10 @@ facet_wrap(~place,ncol=1)+
 
 
 ```
+
 # Time Use Maps 
 You may also interested in finding state differences in how older adults spent their time before and during the pandemic. We can see a reduction of time spent on outside home activities in 2020, the pandemic year compared to 2019, the pre-pandemic year.
+
 ```{r warning=FALSE, message= F}
 #map by states
 library(mapdata)
