@@ -3,9 +3,9 @@ Using R for Data visualization of American Time Use Data.
 
 This project is based on a study examining changes in time use patterns in social engagement of US older adults before and during the COVID-19 pandemic (2019-2021). I am interested in how does social engagement shift from pre-pandemic to pandemic periods among adults aged 60 and older by location and activity type.
 
-We drew data from American Time Use Survey (ATUS) from 2019 to 2021 to examine the impact of the COVID-19 pandemic on older adults’ social engagement. 
+I drew data from American Time Use Survey (ATUS) from 2019 to 2021 to examine the impact of the COVID-19 pandemic on older adults’ social engagement. 
 
-To see my final project, go to https://jyu-412.github.io/ATUS-time-use-data-visualization/
+https://jyu-412.github.io/ATUS-time-use-data-visualization/
 
 Data can be access here: https://www.atusdata.org/atus/ 
 
