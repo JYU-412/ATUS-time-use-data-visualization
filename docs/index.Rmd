@@ -402,7 +402,7 @@ map20<-map1%>%filter(year==2020)
 
 MergedStates19 <-states%>%left_join(map19, by = "region")
 MergedStates20 <-states%>%left_join(map20, by = "region")
-
+ 
 
 ```
 
