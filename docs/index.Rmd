@@ -131,7 +131,7 @@ lplot<-ggplot(data=line, aes(x = ym, y = engage, color= group, group= group)) +
   theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1, size=5), legend.title = element_blank(),legend.text = element_text(size=8))+
   scale_color_manual(values = c("#D16103", "#293352","#9999CC")) +
   coord_cartesian(ylim = c(0,100))
-
+ 
 ```
 Here `gganimate` gives us a nice animation plot.
 ```{r warning=FALSE}
