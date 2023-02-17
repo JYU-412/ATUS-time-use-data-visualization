@@ -81,7 +81,7 @@ scale_x_discrete(expand = c(.1, .1)) +
 
 # Line plots
 
-Here we present a line plot to show how older adults use their time  before and over the course of the pandemic. Note, due to the impact of the pandemic, data collection was paused from March 18, 2020, to May 9, 2020. We actually have a missing month for April 2020. 
+Here we present a line plot to show how older adults use their time  before and over the course of the pandemic. Note, due to the impact of the pandemic, data collection was paused from March 18, 2020, to May 9, 2020. We actually have a missing month for April 2020. Time spent outside home plummeted since the national lockdown.
 ```{r message= F}
 df<-ATUS%>%filter(age>59)%>%select("engage_h","engage_nh", "year", "race4", "weight", "month", "caseid", "female", "edu4" )%>%mutate(ym=format(lubridate::ym(paste0(year,month)), "%Y.%m"), eg=engage_h+engage_nh)
 df$ym<-as.factor(df$ym)
@@ -126,12 +126,12 @@ lplot<-ggplot(data=line, aes(x = ym, y = engage, color= group, group= group)) +
  # geom_vline(xintercept = "2021.08",
               # colour = "grey40",
                #linetype = 2)+ # vertical line
-  labs( x= "Month" , y= 'Time (min)',title= "", color="", type="")+
-  theme_article()+
-  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1), legend.title = element_blank(),legend.text = element_text(size=12))+
+  labs( x= "Month" , y= 'Time (min)',title= "", color="", type="", size=8)+
+  hrbrthemes::theme_ipsum()+
+  theme(axis.text.x = element_text(angle = 90, vjust=0.5, hjust=1, size=5), legend.title = element_blank(),legend.text = element_text(size=8))+
   scale_color_manual(values = c("#D16103", "#293352","#9999CC")) +
   coord_cartesian(ylim = c(0,100))
-#lplot
+
 ```
 Here `gganimate` gives us a nice animation plot.
 ```{r warning=FALSE}
